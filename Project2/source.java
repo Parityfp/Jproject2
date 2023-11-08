@@ -46,9 +46,9 @@ public class source {
 
     static public void ReadConfig(){
         //for codebeans
-        //String inputFile = "src/main/Java/Project2_6580128/config.txt";
+        //String inputFile = "src/main/Java/Project2/config.txt";
         //for vscode
-        String inputFile = "C:\\Users/person/Desktop/Coding/Java/paradigms/src/Project2_6580128/config.txt";
+        String inputFile = "C:\\Users/person/Desktop/Coding/Java/paradigms/src/Project2/config.txt";
         try{
             Scanner fscanner = new Scanner(new File(inputFile));
             
