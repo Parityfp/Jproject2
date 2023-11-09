@@ -40,54 +40,52 @@ public class source {
     static int days;
 
     public static void main(String[] args) {
+        System.out.printf("%-15s>> Enter config file for simulation =\n",Thread.currentThread().getName());
         ReadConfig();
         System.out.println(days + "\n" + AllMaterials.toString() + "\n" + AllSuppliers + "\n" + AllFactories);
     }
 
-    static public void ReadConfig(){
+    static void ReadConfig(){
         //for codebeans
-        //String inputFile = "src/main/Java/Project2/config.txt";
+        String path = "src/main/Java/Project2/", filename = "config";
+        Scanner keyboardScan = new Scanner(System.in);
         //for vscode
-        String inputFile = "C:\\Users/person/Desktop/Coding/Java/paradigms/src/Project2/config.txt";
-        try{
-            Scanner fscanner = new Scanner(new File(inputFile));
-            
+        //String inputFile = "C:\\Users/person/Desktop/Coding/Java/paradigms/src/Project2/config.txt";
+         boolean fileopened = false;
+        while (!fileopened){
+        try( Scanner fscanner = new Scanner(new File(path+filename));){
+            fileopened = true;
             while(fscanner.hasNext()){
                 String line = fscanner.nextLine();
                 String [] col = line.split(",");
-
-                if("D".equals(col[0])){
-                    days = Integer.parseInt(col[1].trim());
-                }
-
-                if("M".equals(col[0])){
-                    for(int i = 1; i < col.length; i++){
+            switch(col[0]){
+                case("D"): days = Integer.parseInt(col[1].trim()); break;
+                case("M"): for(int i = 1; i < col.length; i++){
                         Material material = new Material(col[i].trim());
                         AllMaterials.add(material);
-                    }
-                }
-
-                if("S".equals(col[0])){
-                    ArrayList<String> supplier = new ArrayList<>();
+                    } break;
+                case("S"):ArrayList<String> supplier = new ArrayList<>();
                     for(int i = 1; i < col.length; i++){
                         supplier.add(col[i].trim()); 
                     }
-                    AllSuppliers.add(supplier);
-                }
-
-                if("F".equals(col[0])){
-                    ArrayList<String> factory = new ArrayList<>();
+                    AllSuppliers.add(supplier);    
+                    break;
+                case("F"):ArrayList<String> factory = new ArrayList<>();
                     for(int i = 1; i < col.length; i++){
                         factory.add(col[i].trim()); 
                     }
-                    AllFactories.add(factory);
-                }
+                    AllFactories.add(factory); 
+                    break;
+            }
             }
         fscanner.close();
         
         }catch (Exception e) {
-            System.err.println("An error occurred while processing the file.");
-            e.printStackTrace();
+            System.out.println();
+            System.out.println(e);
+            System.out.printf("Thread %-15s>> Enter config file for simulation =\n",Thread.currentThread().getName());
+            filename = keyboardScan.next();
         }
+    }
     }
 }
