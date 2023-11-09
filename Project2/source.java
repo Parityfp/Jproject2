@@ -18,10 +18,10 @@ class Material {
         return this.ID;
     }
 }
-/*
+/* README
+threads are running in the correct order now, but the code for it should be fixed for more score. 
 to do list:
-- create wait/notify for waiting conditions 
-- cyclic barrier for only the factorythreads 
+
 - main thread report before day 1 
 - threads activity
 - summary on main 
