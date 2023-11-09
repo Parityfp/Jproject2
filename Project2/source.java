@@ -29,7 +29,7 @@ to do list:
 */
 abstract class MyAbstractThread extends Thread
 {
-    protected  int		rounds,rates;
+    protected  int		rounds,rates,length;
     protected  CyclicBarrier	cfinish;
     protected Random random;
     protected SharedBuffer share;
@@ -42,7 +42,7 @@ abstract class MyAbstractThread extends Thread
     public void setRounds(int r)			{ rounds = r; }
     public void setCyclicBarrier(CyclicBarrier f)	{ cfinish = f; }
     public void setShare(SharedBuffer sh)               {share = sh;}
-
+    //public void setlength(int l)               {length = l;}
     @Override
     synchronized public  void run()
     {
@@ -62,19 +62,20 @@ class SupplierThread extends MyAbstractThread {
  public SupplierThread(String name)		{ super(name); }
  @Override
  synchronized public void run() {
-        share.access(2,2,3);
+        
      for(int i=1; i<=rounds;i++){
         try {
             
-            
+            share.access(2);
             Thread.sleep(random.nextInt(500));
             System.out.println(Thread.currentThread().getName());
         } catch (Exception e) {
             System.out.println(e);
         }
         try { cfinish.await();  } catch (Exception e) { }
-            share.access(2,2,3);
-        }
+            share.update(3);
+            if(i<rounds)share.access(2);
+        } System.out.println(Thread.currentThread().getName()+ " Finishes");
     }
 
 }
@@ -91,18 +92,19 @@ class FactoryThread extends MyAbstractThread {
     }
     @Override
     synchronized public void run() {
-        share.access(3,3,1);
+        
         for(int i=1; i<=rounds;i++){
         try {
-            
+            share.access(3);
             Thread.sleep(random.nextInt(500));
             System.out.println(Thread.currentThread().getName());
         } catch (Exception e) {
             System.out.println(e);
         }
         try { cfinish.await();  } catch (Exception e) { }
-        share.access(3,3,1);
-        }
+        share.update(1);
+        if(i<rounds)share.access(3);
+        } System.out.println(Thread.currentThread().getName()+ " Finishes");
     }
 }
 
@@ -184,7 +186,8 @@ class FactoryThread extends MyAbstractThread {
         for (FactoryThread F : AllFthreads) { F.setCyclicBarrier(Fbarrier); F.setRounds(days); F.setShare(share);F.start();}
         try{Thread.sleep(1000);}catch (Exception e) {}
         for(int i=1; i<=days;i++){
-         share.access(1,1,2);
+         share.access(1);
+         share.update(2);
          System.out.println(Thread.currentThread().getName() + i);
             
         }
@@ -211,15 +214,19 @@ class SharedBuffer
 	private int share;
 	public SharedBuffer(int s)         { share = s; }
 
-	synchronized public void access(int w, int n, int up)
+	synchronized public void access(int w)
 	{
-		while(share!=w) try { wait(); Thread.sleep(1000);} catch(Exception e) { }
-                if(share==w){ share = up;
-                              notifyAll();
-                              System.out.println(Thread.currentThread().getName() +"notifyall");
-                }
-                try{
-                Thread.sleep(200);
-                }catch(Exception e){}
+                    notifyAll();
+		while(share!=w) try { wait(); Thread.sleep(500);} catch(Exception e) { }
+                              
+                              
+                             // System.out.println(Thread.currentThread().getName() +"notifyall");
+                
+
 	}
+        
+        public void update(int up)
+        {
+            share = up; //System.out.println(Thread.currentThread().getName() +" updates");
+        }
     }
