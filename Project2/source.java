@@ -18,10 +18,11 @@ class Material {
         return this.ID;
     }
 }
-/*
+/* README
+threads are running in the correct order now, but the code for it should be fixed for more score. 
 to do list:
-- create wait/notify for waiting conditions 
-- cyclic barrier for only the factorythreads 
+
+- main thread report before day 1 
 - threads activity
 - summary on main 
 
@@ -126,10 +127,10 @@ class FactoryThread extends MyAbstractThread {
 
     void ReadConfig(){
         //for codebeans
-        //String path = "src/main/Java/Project2/", filename = "config.txt";
+        String path = "src/main/Java/Project2/", filename = "config.txt";
         Scanner keyboardScan = new Scanner(System.in);
         //for vscode
-        String path = "C:\\Users/person/Desktop/Coding/Java/paradigms/src/Project2/", filename = "config.txt"; 
+        //String path = "C:\\Users/person/Desktop/Coding/Java/paradigms/src/Project2/", filename = "config.txt"; 
          boolean fileopened = false;
         while (!fileopened){
         try( Scanner fscanner = new Scanner(new File(path+filename));){
