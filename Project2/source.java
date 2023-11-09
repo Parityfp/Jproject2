@@ -22,7 +22,6 @@ class Material {
 threads are running in the correct order now, but the code for it should be fixed for more score. 
 to do list:
 
-- main thread report before day 1 
 - threads activity
 - summary on main 
 
