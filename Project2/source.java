@@ -21,8 +21,9 @@ class Material {
 /* README
 threads are running in the correct order now, but the code for it should be fixed for more score. 
 to do list:
-
+- add info to threads 
 - threads activity
+- Make material be updatable by one thread at a time 
 - summary on main 
 
 */
