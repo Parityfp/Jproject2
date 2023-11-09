@@ -1,21 +1,35 @@
 package Project2;    
 import java.io.File;import java.util.*;import java.util.concurrent.*;
 
-class Material {
-    public String ID;
-    protected int balance = 0;
-    protected Random random;
+abstract class Item extends Semaphore {
+    protected String ID;
+    protected int    balance;
+   
+    
+    public Item()      { super(1,true);}    
+    public Item(String id) {
+        super(1,true);
+        ID = id;
+        balance = 0; 
+                
+    }
+}
+class Material extends Item {
 
-    public Material(int Balance) {
-        this.balance = this.balance + Balance;
-    }    
-    public Material(String id) {
-        this.ID = id;
+    public Material(String id)   { super(id); }
+    public void use() 
+    {
+        
     }
 
-    @Override
-    public String toString(){
-        return this.ID;
+
+}
+class Product extends Item { 
+    public  Product(String id)   { super(id); }
+    
+    public void create() 
+    {
+        
     }
 }
 /* README
@@ -249,3 +263,4 @@ class SharedBuffer
             share = up; //System.out.println(Thread.currentThread().getName() +" updates");
         }
     }
+
