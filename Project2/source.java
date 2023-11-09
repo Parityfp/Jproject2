@@ -22,40 +22,61 @@ class Material {
 to do list:
 - create wait/notify for waiting conditions 
 - cyclic barrier for only the factorythreads 
-- main thread report before day 1 
 - threads activity
 - summary on main 
 
 */
 abstract class MyAbstractThread extends Thread
 {
-    protected  int		rounds,rates;
+    protected  int		rounds,rates,length;
     protected  CyclicBarrier	cfinish;
     protected Random random;
-
-    public MyAbstractThread(String name)		{ super(name);  random = new Random();}
+    protected SharedBuffer share;
+    
+    public MyAbstractThread(String name)		{ super(name);  random = new Random();
+    
+    
+    }
 
     public void setRounds(int r)			{ rounds = r; }
     public void setCyclicBarrier(CyclicBarrier f)	{ cfinish = f; }
-    
-
+    public void setShare(SharedBuffer sh)               {share = sh;}
+    //public void setlength(int l)               {length = l;}
     @Override
     synchronized public  void run()
     {
         
         for(int i=1; i<=rounds;i++){
         try {
-            //Thread.sleep(random.nextInt(100,200));
+            Thread.sleep(random.nextInt(100,200));
             System.out.println(Thread.currentThread().getName());
         } catch (Exception e) {
             System.out.println(e);
         }
-        try { if(cfinish.getNumberWaiting() == 0 ) notify(); cfinish.await();  } catch (Exception e) { }
+        try { cfinish.await();  } catch (Exception e) { }
     }
     }
 };
 class SupplierThread extends MyAbstractThread {
  public SupplierThread(String name)		{ super(name); }
+ @Override
+ synchronized public void run() {
+        
+     for(int i=1; i<=rounds;i++){
+        try {
+            
+            share.access(2);
+            Thread.sleep(random.nextInt(500));
+            System.out.println(Thread.currentThread().getName());
+        } catch (Exception e) {
+            System.out.println(e);
+        }
+        try { cfinish.await();  } catch (Exception e) { }
+            share.update(3);
+            if(i<rounds)share.access(2);
+        } System.out.println(Thread.currentThread().getName()+ " Finishes");
+    }
+
 }
 
 class FactoryThread extends MyAbstractThread {
@@ -68,6 +89,22 @@ class FactoryThread extends MyAbstractThread {
         lots = 0;
         product = p;
     }
+    @Override
+    synchronized public void run() {
+        
+        for(int i=1; i<=rounds;i++){
+        try {
+            share.access(3);
+            Thread.sleep(random.nextInt(500));
+            System.out.println(Thread.currentThread().getName());
+        } catch (Exception e) {
+            System.out.println(e);
+        }
+        try { cfinish.await();  } catch (Exception e) { }
+        share.update(1);
+        if(i<rounds)share.access(3);
+        } System.out.println(Thread.currentThread().getName()+ " Finishes");
+    }
 }
 
  class source {
@@ -76,22 +113,23 @@ class FactoryThread extends MyAbstractThread {
     static ArrayList<ArrayList<String>> AllFactories = new ArrayList<>();
     static ArrayList<FactoryThread> AllFthreads = new ArrayList <>();
     static ArrayList<SupplierThread> AllSthreads = new ArrayList <>();
-    static int days;
-    static int parties = 0;
+     int days;
+     int partiesF = 0, partiesS = 0;
+     int runmain = 0;
     public static void main(String[] args) {
-        ReadConfig();
-        source sim = new source();
+         source sim = new source();
+        
+        sim.ReadConfig();
         sim.runsimulation();
         
     }
 
-    static void ReadConfig(){
+    void ReadConfig(){
         //for codebeans
-        
-        String path = "src/main/Java/Project2/", filename = "config.txt";
+        //String path = "src/main/Java/Project2/", filename = "config.txt";
         Scanner keyboardScan = new Scanner(System.in);
         //for vscode
-        //String inputFile = "C:\\Users/person/Desktop/Coding/Java/paradigms/src/Project2/config.txt";
+        String path = "C:\\Users/person/Desktop/Coding/Java/paradigms/src/Project2/", filename = "config.txt"; 
          boolean fileopened = false;
         while (!fileopened){
         try( Scanner fscanner = new Scanner(new File(path+filename));){
@@ -112,7 +150,7 @@ class FactoryThread extends MyAbstractThread {
                     AllSuppliers.add(supplier); 
                     SupplierThread S = new SupplierThread(col[1].trim());
                     AllSthreads.add(S);
-                    parties++;    
+                    partiesS++;    
                     break;
                 case("F"):ArrayList<String> factory = new ArrayList<>();
                     for(int i = 1; i < col.length; i++){
@@ -121,7 +159,7 @@ class FactoryThread extends MyAbstractThread {
                     AllFactories.add(factory); 
                     FactoryThread F = new FactoryThread(col[1].trim(), col[2].trim());
                     AllFthreads.add(F);
-                    parties++;
+                    partiesF++;
                     break;
             }
             }
@@ -138,20 +176,38 @@ class FactoryThread extends MyAbstractThread {
     }
     
     synchronized public void runsimulation(){
-        System.out.println(days + "\n" + AllMaterials.toString() + "\n" + AllSuppliers + "\n" + AllFactories);
-        CyclicBarrier barrier = new CyclicBarrier(parties+1);
-         
-        for (SupplierThread S : AllSthreads){ S.setCyclicBarrier(barrier); S.setRounds(days); S.start();}
-        for (FactoryThread F : AllFthreads) { F.setCyclicBarrier(barrier); F.setRounds(days); F.start();}
-        
+        SharedBuffer share = new SharedBuffer(1);
+        //int update = 10, w= 1, n=1;
+
+        System.out.printf("%-15s>>  simulation days = %d\n", Thread.currentThread().getName(), days);
+
+        for(int i=0; i < AllSuppliers.size(); i++){
+            System.out.printf("%-15s>>  %s  daily supply rates =  ", Thread.currentThread().getName(), AllSuppliers.get(i).get(0));
+            for(int j=0; j < AllMaterials.size(); j++){
+                System.out.printf("%3s %s     ", AllSuppliers.get(i).get(1+j), AllMaterials.get(j).toString());
+            }
+            System.out.printf("\n");
+        }
+
+        for(int i=0; i < AllFactories.size(); i++){
+            System.out.printf("%-15s>>  %s  daily use     rates =  ", Thread.currentThread().getName(), AllFactories.get(i).get(0)); 
+            for(int j=0; j < AllMaterials.size(); j++){
+                System.out.printf("%3d %s     ", Integer.parseInt(AllFactories.get(i).get(3+j)) * Integer.parseInt(AllFactories.get(i).get(2)), AllMaterials.get(j).toString());
+            }
+            System.out.printf("producing %3s %s", AllFactories.get(i).get(2), AllFactories.get(i).get(1));
+            System.out.printf("\n");
+        }
+
+        CyclicBarrier Sbarrier = new CyclicBarrier(partiesS);
+        for (SupplierThread S : AllSthreads){ S.setCyclicBarrier(Sbarrier); S.setRounds(days); S.setShare(share);S.start();}
+         CyclicBarrier Fbarrier = new CyclicBarrier(partiesF);
+        for (FactoryThread F : AllFthreads) { F.setCyclicBarrier(Fbarrier); F.setRounds(days); F.setShare(share);F.start();}
+        try{Thread.sleep(1000);}catch (Exception e) {}
         for(int i=1; i<=days;i++){
-        System.out.println(Thread.currentThread().getName() + i + barrier.getNumberWaiting());
-        try { 
-        while(barrier.getNumberWaiting()>0)
-            wait(); 
-        notifyAll();
-        }catch (Exception e) { }
-        
+         share.access(1);
+         share.update(2);
+         System.out.println(Thread.currentThread().getName() + i);
+            
         }
         for (FactoryThread F : AllFthreads) {
             try {
@@ -169,4 +225,26 @@ class FactoryThread extends MyAbstractThread {
         }
         System.out.println("summary");
     }
+    
 }
+class SharedBuffer
+    {
+	private int share;
+	public SharedBuffer(int s)         { share = s; }
+
+	synchronized public void access(int w)
+	{
+                    notifyAll();
+		while(share!=w) try { wait(); Thread.sleep(500);} catch(Exception e) { }
+                              
+                              
+                             // System.out.println(Thread.currentThread().getName() +"notifyall");
+                
+
+	}
+        
+        public void update(int up)
+        {
+            share = up; //System.out.println(Thread.currentThread().getName() +" updates");
+        }
+    }
