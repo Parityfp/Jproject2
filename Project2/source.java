@@ -32,12 +32,16 @@ abstract class MyAbstractThread extends Thread
     protected  int		rounds,rates;
     protected  CyclicBarrier	cfinish;
     protected Random random;
-
-    public MyAbstractThread(String name)		{ super(name);  random = new Random();}
+    protected SharedBuffer share;
+    
+    public MyAbstractThread(String name)		{ super(name);  random = new Random();
+    
+    
+    }
 
     public void setRounds(int r)			{ rounds = r; }
     public void setCyclicBarrier(CyclicBarrier f)	{ cfinish = f; }
-    
+    public void setShare(SharedBuffer sh)               {share = sh;}
 
     @Override
     synchronized public  void run()
@@ -45,17 +49,34 @@ abstract class MyAbstractThread extends Thread
         
         for(int i=1; i<=rounds;i++){
         try {
-            //Thread.sleep(random.nextInt(100,200));
+            Thread.sleep(random.nextInt(100,200));
             System.out.println(Thread.currentThread().getName());
         } catch (Exception e) {
             System.out.println(e);
         }
-        try { if(cfinish.getNumberWaiting() == 0 ) notify(); cfinish.await();  } catch (Exception e) { }
+        try { cfinish.await();  } catch (Exception e) { }
     }
     }
 };
 class SupplierThread extends MyAbstractThread {
  public SupplierThread(String name)		{ super(name); }
+ @Override
+ synchronized public void run() {
+        share.access(2,2,3);
+     for(int i=1; i<=rounds;i++){
+        try {
+            
+            
+            Thread.sleep(random.nextInt(500));
+            System.out.println(Thread.currentThread().getName());
+        } catch (Exception e) {
+            System.out.println(e);
+        }
+        try { cfinish.await();  } catch (Exception e) { }
+            share.access(2,2,3);
+        }
+    }
+
 }
 
 class FactoryThread extends MyAbstractThread {
@@ -68,6 +89,21 @@ class FactoryThread extends MyAbstractThread {
         lots = 0;
         product = p;
     }
+    @Override
+    synchronized public void run() {
+        share.access(3,3,1);
+        for(int i=1; i<=rounds;i++){
+        try {
+            
+            Thread.sleep(random.nextInt(500));
+            System.out.println(Thread.currentThread().getName());
+        } catch (Exception e) {
+            System.out.println(e);
+        }
+        try { cfinish.await();  } catch (Exception e) { }
+        share.access(3,3,1);
+        }
+    }
 }
 
  class source {
@@ -76,18 +112,19 @@ class FactoryThread extends MyAbstractThread {
     static ArrayList<ArrayList<String>> AllFactories = new ArrayList<>();
     static ArrayList<FactoryThread> AllFthreads = new ArrayList <>();
     static ArrayList<SupplierThread> AllSthreads = new ArrayList <>();
-    static int days;
-    static int parties = 0;
+     int days;
+     int partiesF = 0, partiesS = 0;
+     int runmain = 0;
     public static void main(String[] args) {
-        ReadConfig();
-        source sim = new source();
+         source sim = new source();
+        
+        sim.ReadConfig();
         sim.runsimulation();
         
     }
 
-    static void ReadConfig(){
+    void ReadConfig(){
         //for codebeans
-        
         String path = "src/main/Java/Project2/", filename = "config.txt";
         Scanner keyboardScan = new Scanner(System.in);
         //for vscode
@@ -112,7 +149,7 @@ class FactoryThread extends MyAbstractThread {
                     AllSuppliers.add(supplier); 
                     SupplierThread S = new SupplierThread(col[1].trim());
                     AllSthreads.add(S);
-                    parties++;    
+                    partiesS++;    
                     break;
                 case("F"):ArrayList<String> factory = new ArrayList<>();
                     for(int i = 1; i < col.length; i++){
@@ -121,7 +158,7 @@ class FactoryThread extends MyAbstractThread {
                     AllFactories.add(factory); 
                     FactoryThread F = new FactoryThread(col[1].trim(), col[2].trim());
                     AllFthreads.add(F);
-                    parties++;
+                    partiesF++;
                     break;
             }
             }
@@ -138,20 +175,18 @@ class FactoryThread extends MyAbstractThread {
     }
     
     synchronized public void runsimulation(){
+        SharedBuffer share = new SharedBuffer(1);
+        //int update = 10, w= 1, n=1;
         System.out.println(days + "\n" + AllMaterials.toString() + "\n" + AllSuppliers + "\n" + AllFactories);
-        CyclicBarrier barrier = new CyclicBarrier(parties+1);
-         
-        for (SupplierThread S : AllSthreads){ S.setCyclicBarrier(barrier); S.setRounds(days); S.start();}
-        for (FactoryThread F : AllFthreads) { F.setCyclicBarrier(barrier); F.setRounds(days); F.start();}
-        
+        CyclicBarrier Sbarrier = new CyclicBarrier(partiesS);
+        for (SupplierThread S : AllSthreads){ S.setCyclicBarrier(Sbarrier); S.setRounds(days); S.setShare(share);S.start();}
+         CyclicBarrier Fbarrier = new CyclicBarrier(partiesF);
+        for (FactoryThread F : AllFthreads) { F.setCyclicBarrier(Fbarrier); F.setRounds(days); F.setShare(share);F.start();}
+        try{Thread.sleep(1000);}catch (Exception e) {}
         for(int i=1; i<=days;i++){
-        System.out.println(Thread.currentThread().getName() + i + barrier.getNumberWaiting());
-        try { 
-        while(barrier.getNumberWaiting()>0)
-            wait(); 
-        notifyAll();
-        }catch (Exception e) { }
-        
+         share.access(1,1,2);
+         System.out.println(Thread.currentThread().getName() + i);
+            
         }
         for (FactoryThread F : AllFthreads) {
             try {
@@ -169,4 +204,22 @@ class FactoryThread extends MyAbstractThread {
         }
         System.out.println("summary");
     }
+    
 }
+class SharedBuffer
+    {
+	private int share;
+	public SharedBuffer(int s)         { share = s; }
+
+	synchronized public void access(int w, int n, int up)
+	{
+		while(share!=w) try { wait(); Thread.sleep(1000);} catch(Exception e) { }
+                if(share==w){ share = up;
+                              notifyAll();
+                              System.out.println(Thread.currentThread().getName() +"notifyall");
+                }
+                try{
+                Thread.sleep(200);
+                }catch(Exception e){}
+	}
+    }
