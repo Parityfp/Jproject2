@@ -13,10 +13,18 @@ abstract class Item extends Semaphore {
         balance = 0; 
                 
     }
+
+    public int getBalance(){
+        return balance;
+    }
 }
 class Material extends Item {
 
     public Material(String id)   { super(id); }
+    public synchronized void addToBalance(int amount) {
+        balance += amount;
+    }
+
     public void use() 
     {
         
@@ -84,15 +92,23 @@ class SupplierThread extends MyAbstractThread {
         
      for(int i=1; i<=rounds;i++){
         try {
-            
             share.access(2);
             Thread.sleep(random.nextInt(500));
-            for(i = 0; i < source.AllSuppliers.size(); i++){
-                if(Thread.currentThread().getName().equals(source.AllSuppliers.get(i).get(0))){
-                    for(int j = 0; j < source.AllMaterials.size(); j++)
-                    System.out.printf("%-15s>>  put %10s %s\n", Thread.currentThread().getName(), source.AllSuppliers.get(i).get(1+j), source.AllMaterials.get(j).toString());
+            for(int k = 0; k < source.AllSuppliers.size(); k++){
+                
+                for(int j = 0; j < source.AllMaterials.size(); j++) {
+                    System.out.printf("%-15s>>  put %10s %s", 
+                        Thread.currentThread().getName(), 
+                        source.AllSuppliers.get(k).get(1+j), 
+                        source.AllMaterials.get(j).toString()
+                    );
+                    source.AllMaterials.get(j).addToBalance(
+                        Integer.parseInt(source.AllSuppliers.get(k).get(1+j))
+                    );
+                    System.out.printf("        balance = %s\n", source.AllMaterials.get(j).getBalance());
                 }
             }
+
         } catch (Exception e) {
             System.out.println(e);
         }
