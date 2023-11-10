@@ -130,6 +130,7 @@ class FactoryThread extends MyAbstractThread {
         Scanner keyboardScan = new Scanner(System.in);
         //for vscode
         //String path = "C:\\Users/person/Desktop/Coding/Java/paradigms/src/Project2/", filename = "config.txt"; 
+        //String path = "Project2/", filename = "config.txt"; 
          boolean fileopened = false;
         while (!fileopened){
         try( Scanner fscanner = new Scanner(new File(path+filename));){
@@ -206,7 +207,8 @@ class FactoryThread extends MyAbstractThread {
         for(int i=1; i<=days;i++){
          share.access(1);
          share.update(2);
-         System.out.println(Thread.currentThread().getName() + i);
+         System.out.printf("\n%-15s>>  -----------------------------------------------------------------------\n", Thread.currentThread().getName());
+         System.out.printf("%-15s>>  Day %d\n", Thread.currentThread().getName(), i);
             
         }
         for (FactoryThread F : AllFthreads) {
