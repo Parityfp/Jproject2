@@ -95,8 +95,8 @@ class SupplierThread extends MyAbstractThread {
             share.access(2);
             Thread.sleep(random.nextInt(500));
             for(int k = 0; k < source.AllSuppliers.size(); k++){
-                
-                for(int j = 0; j < source.AllMaterials.size(); j++) {
+
+                for(int j = 0; j < source.AllMaterials.size()-1; j++) {
                     System.out.printf("%-15s>>  put %10s %s", 
                         Thread.currentThread().getName(), 
                         source.AllSuppliers.get(k).get(1+j), 
