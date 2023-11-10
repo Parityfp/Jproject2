@@ -22,6 +22,11 @@ class Material extends Item {
         
     }
 
+    @Override
+    public String toString(){
+        return this.ID;
+    }
+
 
 }
 class Product extends Item { 
@@ -82,7 +87,12 @@ class SupplierThread extends MyAbstractThread {
             
             share.access(2);
             Thread.sleep(random.nextInt(500));
-            System.out.println(Thread.currentThread().getName());
+            for(i = 0; i < source.AllSuppliers.size(); i++){
+                if(Thread.currentThread().getName().equals(source.AllSuppliers.get(i).get(0))){
+                    for(int j = 0; j < source.AllMaterials.size(); j++)
+                    System.out.printf("%-15s>>  put %10s %s\n", Thread.currentThread().getName(), source.AllSuppliers.get(i).get(1+j), source.AllMaterials.get(j).toString());
+                }
+            }
         } catch (Exception e) {
             System.out.println(e);
         }
@@ -141,11 +151,11 @@ class FactoryThread extends MyAbstractThread {
 
     void ReadConfig(){
         //for codebeans
-        String path = "src/main/Java/Project2/", filename = "config.txt";
+        //String path = "src/main/Java/Project2/", filename = "config.txt";
         Scanner keyboardScan = new Scanner(System.in);
         //for vscode
         //String path = "C:\\Users/person/Desktop/Coding/Java/paradigms/src/Project2/", filename = "config.txt"; 
-        //String path = "Project2/", filename = "config.txt"; 
+        String path = "Project2/", filename = "config.txt"; 
          boolean fileopened = false;
         while (!fileopened){
         try( Scanner fscanner = new Scanner(new File(path+filename));){
