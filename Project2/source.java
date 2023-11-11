@@ -17,17 +17,22 @@ abstract class Item extends Semaphore {
     public int getBalance(){
         return balance;
     }
+    public String getID(){ return ID;}
 }
 class Material extends Item {
 
     public Material(String id)   { super(id); }
     public synchronized void addToBalance(int amount) {
         balance += amount;
+        System.out.printf("%-15s >>  put %10d %-15s balance = %8d %s \n",
+                Thread.currentThread().getName(),amount,ID,balance,ID);
     }
 
-    public void use() 
+    public void use(int amount) 
     {
-        
+        balance -= amount;
+         System.out.printf("%-15s >>  get %10d %-15s balance = %8d %s \n",
+                Thread.currentThread().getName(),amount,ID,balance,ID);
     }
 
     @Override
@@ -38,6 +43,7 @@ class Material extends Item {
 
 }
 class Product extends Item { 
+    
     public  Product(String id)   { super(id); }
     
     public void create() 
@@ -46,21 +52,23 @@ class Product extends Item {
     }
 }
 /* README
-threads are running in the correct order now, but the code for it should be fixed for more score. 
+please build methods from inside the threads to satisfy the project conditions. 
+
+threads should have most of the needed info now
 to do list:
-- add info to threads 
-- threads activity
+- threads activity for factory process
 - Make material be updatable by one thread at a time 
 - summary on main 
 
 */
 abstract class MyAbstractThread extends Thread
 {
-    protected  int		rounds,rates,length;
+    protected  int		rounds,length;
     protected  CyclicBarrier	cfinish;
     protected Random random;
     protected SharedBuffer share;
-    
+    protected ArrayList<Material>            sharedMaterial;
+    protected int[] rates;
     public MyAbstractThread(String name)		{ super(name);  random = new Random();
     
     
@@ -86,14 +94,21 @@ abstract class MyAbstractThread extends Thread
     }
 };
 class SupplierThread extends MyAbstractThread {
- public SupplierThread(String name)		{ super(name); }
+ 
+ public SupplierThread(String name, ArrayList<Material> ma,int[] r)		
+ { 
+     super(name); 
+     sharedMaterial = ma;
+     rates = r;
+ 
+ }
  @Override
  synchronized public void run() {
         
      for(int i=1; i<=rounds;i++){
         try {
             share.access(2);
-            Thread.sleep(random.nextInt(500));
+            /*
             for(int k = 0; k < source.AllSuppliers.size(); k++){
                 if(Thread.currentThread().getName().equals(source.AllSuppliers.get(k).get(0))){
                     for(int j = 0; j < source.AllMaterials.size(); j++) {
@@ -109,7 +124,11 @@ class SupplierThread extends MyAbstractThread {
                     }
                 }
             }
+               */
+            for(int k = 0; k < rates.length; k++){
+                sharedMaterial.get(k).addToBalance(rates[k]);
 
+            }
         } catch (Exception e) {
             System.out.println(e);
         }
@@ -124,12 +143,16 @@ class SupplierThread extends MyAbstractThread {
 class FactoryThread extends MyAbstractThread {
 
     public int lots;
-    public String product;
+    private Product product;
+    private int[] holding;
 
-    public FactoryThread(String name,String p){ 
+    public FactoryThread(String name,Product p, ArrayList<Material> ma,int[] r, int[] h){ 
         super(name);
         lots = 0;
         product = p;
+        sharedMaterial = ma;
+        rates = r;
+        holding = h;
     }
     @Override
     synchronized public void run() {
@@ -137,11 +160,19 @@ class FactoryThread extends MyAbstractThread {
         for(int i=1; i<=rounds;i++){
         try {
             share.access(3);
-            Thread.sleep(random.nextInt(500));
-            System.out.println(Thread.currentThread().getName());
+            System.out.printf("%-15s >>  Holding ",Thread.currentThread().getName());
+            for(int k = 0; k < holding.length; k++){
+               System.out.printf(" %10d %-15s ",holding[k], sharedMaterial.get(k).getID()); 
+            }
+            System.out.println();
+            //Thread.sleep(random.nextInt(500));
+           // System.out.println(Thread.currentThread().getName());
         } catch (Exception e) {
             System.out.println(e);
         }
+        try { cfinish.await();  } catch (Exception e) { }
+        //critical section
+       
         try { cfinish.await();  } catch (Exception e) { }
         share.update(1);
         if(i<rounds)share.access(3);
@@ -150,11 +181,12 @@ class FactoryThread extends MyAbstractThread {
 }
 
  class source {
-    static ArrayList<Material> AllMaterials = new ArrayList<>();
-    static ArrayList<ArrayList<String>> AllSuppliers = new ArrayList<>();
-    static ArrayList<ArrayList<String>> AllFactories = new ArrayList<>();
-    static ArrayList<FactoryThread> AllFthreads = new ArrayList <>();
-    static ArrayList<SupplierThread> AllSthreads = new ArrayList <>();
+    ArrayList<Material> AllMaterials = new ArrayList<>();
+    ArrayList<Product> AllProducts = new ArrayList<>();
+    //ArrayList<ArrayList<String>> AllSuppliers = new ArrayList<>();
+    //ArrayList<ArrayList<String>> AllFactories = new ArrayList<>();
+    ArrayList<FactoryThread> AllFthreads = new ArrayList <>();
+    ArrayList<SupplierThread> AllSthreads = new ArrayList <>();
      int days;
      int partiesF = 0, partiesS = 0;
      int runmain = 0;
@@ -168,12 +200,13 @@ class FactoryThread extends MyAbstractThread {
 
     void ReadConfig(){
         //for codebeans
-        //String path = "src/main/Java/Project2/", filename = "config.txt";
+        String path = "src/main/Java/Project2/", filename = "config.txt";
         Scanner keyboardScan = new Scanner(System.in);
         //for vscode
         //String path = "C:\\Users/person/Desktop/Coding/Java/paradigms/src/Project2/", filename = "config.txt"; 
-        String path = "Project2/", filename = "config.txt"; 
-         boolean fileopened = false;
+        //String path = "Project2/", filename = "config.txt"; 
+        int j;
+        boolean fileopened = false;
         while (!fileopened){
         try( Scanner fscanner = new Scanner(new File(path+filename));){
             fileopened = true;
@@ -181,26 +214,54 @@ class FactoryThread extends MyAbstractThread {
                 String line = fscanner.nextLine();
                 String [] col = line.split(",");
             switch(col[0]){
-                case("D"): days = Integer.parseInt(col[1].trim()); break;
+                case("D"): days = Integer.parseInt(col[1].trim()); 
+                System.out.printf("%-15s >>  simulation days = %d\n", Thread.currentThread().getName(), days);
+                break;
                 case("M"): for(int i = 1; i < col.length; i++){
                         Material material = new Material(col[i].trim());
                         AllMaterials.add(material);
                     } break;
-                case("S"):ArrayList<String> supplier = new ArrayList<>();
+                case("S")://ArrayList<String> supplier = new ArrayList<>();
+                    int[] Srates = new int[col.length-2];
                     for(int i = 1; i < col.length; i++){
-                        supplier.add(col[i].trim()); 
+                        //supplier.add(col[i].trim()); 
                     }
-                    AllSuppliers.add(supplier); 
-                    SupplierThread S = new SupplierThread(col[1].trim());
+                    //AllSuppliers.add(supplier);
+                    j = 0;
+                     System.out.printf("%-15s >>  %-12s  daily supply rates = ",Thread.currentThread().getName(), col[1].trim() ) ;
+                    for(int i = 2; i < col.length; i++){
+                       
+                        Srates[j] = Integer.parseInt(col[i].trim()) ;
+                        System.out.printf(" %4d %10s ", Srates[j], AllMaterials.get(j).getID() );
+                        j++;
+                    }
+                   
+                    System.out.println();
+        
+                    SupplierThread S = new SupplierThread(col[1].trim(),AllMaterials,Srates);
                     AllSthreads.add(S);
                     partiesS++;    
                     break;
-                case("F"):ArrayList<String> factory = new ArrayList<>();
+                case("F")://ArrayList<String> factory = new ArrayList<>();
+                    int[] Frates = new int[col.length-4];
+                    int[] holdings = new int[col.length-4];
                     for(int i = 1; i < col.length; i++){
-                        factory.add(col[i].trim()); 
+                       // factory.add(col[i].trim()); 
                     }
-                    AllFactories.add(factory); 
-                    FactoryThread F = new FactoryThread(col[1].trim(), col[2].trim());
+                    System.out.printf("%-15s >>  %-12s  daily use    rates = ",Thread.currentThread().getName(), col[1].trim() ) ;
+                    //AllFactories.add(factory); 
+                    Product p = new Product(col[2].trim());
+                    AllProducts.add(p);
+                     j= 0;
+                    for(int i = 4; i < col.length; i++){
+                        
+                        Frates[j] = Integer.parseInt(col[3].trim())*Integer.parseInt(col[i].trim()) ;
+                         System.out.printf(" %4d %10s ", Frates[j], AllMaterials.get(j).getID() );
+                        holdings[j] = 0;
+                        j++;
+                    }
+                    System.out.printf(" producing %4s %-15s \n", col[3].trim(), col[2].trim() );
+                    FactoryThread F = new FactoryThread(col[1].trim(), p,AllMaterials, Frates, holdings);
                     AllFthreads.add(F);
                     partiesF++;
                     break;
@@ -221,7 +282,7 @@ class FactoryThread extends MyAbstractThread {
     synchronized public void runsimulation(){
         SharedBuffer share = new SharedBuffer(1);
         //int update = 10, w= 1, n=1;
-
+/*
         System.out.printf("%-15s>>  simulation days = %d\n", Thread.currentThread().getName(), days);
 
         for(int i=0; i < AllSuppliers.size(); i++){
@@ -240,7 +301,7 @@ class FactoryThread extends MyAbstractThread {
             System.out.printf("producing %3s %s", AllFactories.get(i).get(2), AllFactories.get(i).get(1));
             System.out.printf("\n");
         }
-
+*/
         CyclicBarrier Sbarrier = new CyclicBarrier(partiesS);
         for (SupplierThread S : AllSthreads){ S.setCyclicBarrier(Sbarrier); S.setRounds(days); S.setShare(share);S.start();}
          CyclicBarrier Fbarrier = new CyclicBarrier(partiesF);
@@ -249,8 +310,8 @@ class FactoryThread extends MyAbstractThread {
         for(int i=1; i<=days;i++){
          share.access(1);
          share.update(2);
-         System.out.printf("\n%-15s>>  -----------------------------------------------------------------------\n", Thread.currentThread().getName());
-         System.out.printf("%-15s>>  Day %d\n", Thread.currentThread().getName(), i);
+         System.out.printf("\n%-15s >>  -----------------------------------------------------------------------\n", Thread.currentThread().getName());
+         System.out.printf("%-15s >>  Day %d\n", Thread.currentThread().getName(), i);
             
         }
         for (FactoryThread F : AllFthreads) {
