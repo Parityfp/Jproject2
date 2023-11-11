@@ -3,7 +3,8 @@ import java.io.File;import java.util.*;import java.util.concurrent.*;
 
 abstract class Item extends Semaphore {
     protected String ID;
-    protected int    balance;
+    protected int    balance, am;
+    protected int lots;
    
     
     public Item()      { super(1,true);}    
@@ -24,31 +25,43 @@ class Material extends Item {
     public Material(String id)   { super(id); }
     public synchronized void addToBalance(int amount) {
         balance += amount;
+        am = amount;
         System.out.printf("%-15s >>  put %10d %-15s balance = %8d %s \n",
                 Thread.currentThread().getName(),amount,ID,balance,ID);
     }
 
-    public void use(int amount) 
+    public synchronized void use(int amount) 
     {
         balance -= amount;
+        am = amount;
          System.out.printf("%-15s >>  get %10d %-15s balance = %8d %s \n",
                 Thread.currentThread().getName(),amount,ID,balance,ID);
     }
 
-    @Override
-    public String toString(){
-        return this.ID;
-    }
-
+    public int getAmount(){return am;}
 
 }
 class Product extends Item { 
     
     public  Product(String id)   { super(id); }
     
-    public void create() 
+    public void create(int[] rates, ArrayList<Material> sharedMaterials, int[] materialsUsed, String id) 
     {
-        
+        System.out.printf("%-15s >>  %s production fails \n",
+                Thread.currentThread().getName(), id);
+        for(int i = 0; i < materialsUsed.length; i++){
+            if(rates[i]!=materialsUsed[i] && materialsUsed[i]>0)
+            System.out.printf("%-15s >>  put %-15d balance = %8d\n",
+                    Thread.currentThread().getName(), materialsUsed[i], sharedMaterials.get(i).balance);
+        }
+    }
+
+    public void create(String id) 
+    {
+        lots++;
+        System.out.printf("%-15s >>  %10s production succeeds, lot %d \n",
+            Thread.currentThread().getName(),id,lots);
+    
     }
 }
 /* README
@@ -59,7 +72,12 @@ to do list:
 - threads activity for factory process
 - Make material be updatable by one thread at a time 
 - summary on main 
+- **wait for all reports to finish before 4.3
 
+
+problems:
+- factories following day 1 do not use materials held from prior day.
+- random shit i left that serve 0 purpose
 */
 abstract class MyAbstractThread extends Thread
 {
@@ -108,23 +126,6 @@ class SupplierThread extends MyAbstractThread {
      for(int i=1; i<=rounds;i++){
         try {
             share.access(2);
-            /*
-            for(int k = 0; k < source.AllSuppliers.size(); k++){
-                if(Thread.currentThread().getName().equals(source.AllSuppliers.get(k).get(0))){
-                    for(int j = 0; j < source.AllMaterials.size(); j++) {
-                        System.out.printf("%-15s>>  put %10s %s", 
-                            Thread.currentThread().getName(), 
-                            source.AllSuppliers.get(k).get(1+j), 
-                            source.AllMaterials.get(j).toString()
-                        );
-                        source.AllMaterials.get(j).addToBalance(
-                            Integer.parseInt(source.AllSuppliers.get(k).get(1+j))
-                        );
-                        System.out.printf("        balance = %s\n", source.AllMaterials.get(j).getBalance());
-                    }
-                }
-            }
-               */
             for(int k = 0; k < rates.length; k++){
                 sharedMaterial.get(k).addToBalance(rates[k]);
 
@@ -145,6 +146,10 @@ class FactoryThread extends MyAbstractThread {
     public int lots;
     private Product product;
     private int[] holding;
+    private static final Semaphore semaphore = new Semaphore(1);
+    private int[] materialsUsed;
+    
+
 
     public FactoryThread(String name,Product p, ArrayList<Material> ma,int[] r, int[] h){ 
         super(name);
@@ -156,6 +161,8 @@ class FactoryThread extends MyAbstractThread {
     }
     @Override
     synchronized public void run() {
+
+        materialsUsed = new int[rates.length];
         
         for(int i=1; i<=rounds;i++){
         try {
@@ -165,11 +172,58 @@ class FactoryThread extends MyAbstractThread {
                System.out.printf(" %10d %-15s ",holding[k], sharedMaterial.get(k).getID()); 
             }
             System.out.println();
+
+            cfinish.await(); 
+
+            semaphore.acquire();
+            share.access(3);
+
+            boolean enough = true;
+            for(int k = 0; k < rates.length; k++){
+                materialsUsed[k] = Math.min(sharedMaterial.get(k).getBalance(), rates[k]);
+                if(sharedMaterial.get(k).balance >= rates[k]){
+                    sharedMaterial.get(k).use(rates[k]);
+                }
+                else if (sharedMaterial.get(k).balance < rates[k]){ 
+                //we decide how many to keep/save to next day, we decide how many to return
+                enough = false;
+                if(sharedMaterial.get(k).balance > 0) sharedMaterial.get(k).use(sharedMaterial.get(k).balance);
+                }
+            }
+            
+            semaphore.release();
+            cfinish.await(); 
+
+            semaphore.acquire();
+            if(enough==false){
+//well then at least one material is insufficient, now we decide how many of those materials should get returned. loop through all of sharedmaterial, and see which is not enough.
+                for(int k = 0; k < materialsUsed.length; k++){
+
+                    System.out.printf("(%d, %d)",materialsUsed[k] , rates[k]);
+                    if(materialsUsed[k] == rates[k]){
+                        System.out.printf("%-15s >>  %d %s  (hold)\n", Thread.currentThread().getName(), materialsUsed[k], sharedMaterial.get(k).getID());
+                        holding[k] =+ rates[k];
+                        
+                    } else if(materialsUsed[k] != rates[k]){
+                        System.out.printf("%-15s >>  %d %s  (return)\n", Thread.currentThread().getName(), materialsUsed[k], sharedMaterial.get(k).getID());
+                        sharedMaterial.get(k).balance =+ materialsUsed[k];
+                    }
+                }
+            }
+            semaphore.release();
+            cfinish.await();
+
+            if(enough==false)product.create(rates, sharedMaterial, materialsUsed, product.getID());
+            else product.create(product.getID());
+
+
             //Thread.sleep(random.nextInt(500));
            // System.out.println(Thread.currentThread().getName());
         } catch (Exception e) {
             System.out.println(e);
         }
+
+
         try { cfinish.await();  } catch (Exception e) { }
         //critical section
        
@@ -200,11 +254,11 @@ class FactoryThread extends MyAbstractThread {
 
     void ReadConfig(){
         //for codebeans
-        String path = "src/main/Java/Project2/", filename = "config.txt";
+        //String path = "src/main/Java/Project2/", filename = "config.txt";
         Scanner keyboardScan = new Scanner(System.in);
         //for vscode
         //String path = "C:\\Users/person/Desktop/Coding/Java/paradigms/src/Project2/", filename = "config.txt"; 
-        //String path = "Project2/", filename = "config.txt"; 
+        String path = "Project2/", filename = "config.txt"; 
         int j;
         boolean fileopened = false;
         while (!fileopened){
@@ -282,26 +336,7 @@ class FactoryThread extends MyAbstractThread {
     synchronized public void runsimulation(){
         SharedBuffer share = new SharedBuffer(1);
         //int update = 10, w= 1, n=1;
-/*
-        System.out.printf("%-15s>>  simulation days = %d\n", Thread.currentThread().getName(), days);
 
-        for(int i=0; i < AllSuppliers.size(); i++){
-            System.out.printf("%-15s>>  %s  daily supply rates =  ", Thread.currentThread().getName(), AllSuppliers.get(i).get(0));
-            for(int j=0; j < AllMaterials.size(); j++){
-                System.out.printf("%3s %s     ", AllSuppliers.get(i).get(1+j), AllMaterials.get(j).toString());
-            }
-            System.out.printf("\n");
-        }
-
-        for(int i=0; i < AllFactories.size(); i++){
-            System.out.printf("%-15s>>  %s  daily use     rates =  ", Thread.currentThread().getName(), AllFactories.get(i).get(0)); 
-            for(int j=0; j < AllMaterials.size(); j++){
-                System.out.printf("%3d %s     ", Integer.parseInt(AllFactories.get(i).get(3+j)) * Integer.parseInt(AllFactories.get(i).get(2)), AllMaterials.get(j).toString());
-            }
-            System.out.printf("producing %3s %s", AllFactories.get(i).get(2), AllFactories.get(i).get(1));
-            System.out.printf("\n");
-        }
-*/
         CyclicBarrier Sbarrier = new CyclicBarrier(partiesS);
         for (SupplierThread S : AllSthreads){ S.setCyclicBarrier(Sbarrier); S.setRounds(days); S.setShare(share);S.start();}
          CyclicBarrier Fbarrier = new CyclicBarrier(partiesF);
