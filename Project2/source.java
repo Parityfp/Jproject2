@@ -74,6 +74,10 @@ to do list:
 - summary on main 
 - **wait for all reports to finish before 4.3
 
+
+problems:
+- factories following day 1 do not use materials held from prior day.
+- random shit i left that serve 0 purpose
 */
 abstract class MyAbstractThread extends Thread
 {
