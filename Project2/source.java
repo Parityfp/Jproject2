@@ -28,11 +28,20 @@ class Material extends Item {
                 Thread.currentThread().getName(),amount,ID,balance,ID);
     }
 
-    public void use(int amount) 
+    public synchronized int use(int amount) 
     {
+        
+        if(amount<balance){
         balance -= amount;
-         System.out.printf("%-15s >>  get %10d %-15s balance = %8d %s \n",
+        }else{
+        amount = balance;
+        balance = 0;
+        } 
+        
+        System.out.printf("%-15s >>  get %10d %-15s balance = %8d %s \n",
                 Thread.currentThread().getName(),amount,ID,balance,ID);
+        
+        return amount;
     }
 
     @Override
@@ -42,23 +51,34 @@ class Material extends Item {
 
 
 }
-class Product extends Item { 
+class Product extends Item implements Comparable<Product> { 
     
     public  Product(String id)   { super(id); }
     
     public void create() 
     {
-        
+        balance++;
+        System.out.printf("%-15s >> %-10s Production succeeds, lot %3d \n",Thread.currentThread().getName(),ID,balance);
+           
+    }
+    
+     @Override
+    public int compareTo(Product other) {
+     Product n = (Product) other;
+     if(this.balance<other.balance) return 1;
+     else if (this.balance>other.balance) return -1;
+     else return this.getID().compareToIgnoreCase(other.getID());
     }
 }
 /* README
 please build methods from inside the threads to satisfy the project conditions. 
 
-threads should have most of the needed info now
+most conditions completed 
 to do list:
-- threads activity for factory process
-- Make material be updatable by one thread at a time 
-- summary on main 
+- testing with demo 1/2
+- formatting 
+- code clean up
+- prep final ver. 
 
 */
 abstract class MyAbstractThread extends Thread
@@ -172,11 +192,26 @@ class FactoryThread extends MyAbstractThread {
         }
         try { cfinish.await();  } catch (Exception e) { }
         //critical section
-       
+       for(int k = 0; k < rates.length; k++){
+             if(holding[k]==0) holding[k]=sharedMaterial.get(k).use(rates[k]);
+
+            }
+        try { cfinish.await();  } catch (Exception e) { }
+        if(Arrays.equals(holding, rates)) {product.create(); Arrays.fill(holding, 0);}
+        else {
+            System.out.printf("%-15s >> %-10s Production fails \n",Thread.currentThread().getName(),product.getID());
+            for(int k = 0; k < rates.length; k++){
+             if(holding[k]!=0&&holding[k]!=rates[k]){
+                 sharedMaterial.get(k).addToBalance(holding[k]);
+                holding[k]=0;
+                }
+            }
+        }
+
         try { cfinish.await();  } catch (Exception e) { }
         share.update(1);
         if(i<rounds)share.access(3);
-        } System.out.println(Thread.currentThread().getName()+ " Finishes");
+        }// System.out.println(Thread.currentThread().getName()+ " Finishes");
     }
 }
 
@@ -328,7 +363,13 @@ class FactoryThread extends MyAbstractThread {
                 System.out.println(e);
             }
         }
-        System.out.println("summary");
+        System.out.printf("\n%-15s >>  -----------------------------------------------------------------------\n", Thread.currentThread().getName());
+        System.out.printf("%-15s >>  Summary\n", Thread.currentThread().getName());
+        
+        Collections.sort(AllProducts);
+        for(int i=0; i<AllProducts.size();i++)
+        System.out.printf("%-15s >>  Total %-10s = %3d lots\n", Thread.currentThread().getName(),AllProducts.get(i).ID,AllProducts.get(i).balance);
+        
     }
     
 }
