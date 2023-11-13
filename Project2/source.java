@@ -33,13 +33,7 @@ class Material extends Item {
         
         if(amount<balance){
         balance -= amount;
-        }else{
-        amount = balance;
-        balance = 0;
-        } 
-        
-        if(amount>0)
-        System.out.printf("%-15s >>  get %10d %-15s balance = %8d %s \n",
+         System.out.printf("%-15s >>  get %10d %-15s balance = %8d %s \n",
                 Thread.currentThread().getName(),amount,ID,balance,ID);
         
         return amount;
@@ -76,12 +70,9 @@ please build methods from inside the threads to satisfy the project conditions.
 
 most conditions completed 
 to do list:
-- testing with demo 1/2
-- formatting 
-- code clean up
-- prep final ver. 
-
-[tested with demo 2, cleaned up output a bit (removed lines that print when use 0 materials)]
+- threads activity for factory process
+- Make material be updatable by one thread at a time 
+- summary on main 
 
 */
 abstract class MyAbstractThread extends Thread
